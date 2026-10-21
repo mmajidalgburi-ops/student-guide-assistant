@@ -3,7 +3,8 @@ from pathlib import Path
 import streamlit as st
 import docx
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import time
@@ -13,14 +14,12 @@ st.title("🧑‍💼 المستشار الإداري - دليل الطلبة")
 
 BASE = Path(__file__).parent
 
-# قراءة المفتاح من إعدادات Streamlit
 try:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 except:
     st.error("❌ لم يتم العثور على المفتاح. يرجى إضافته في إعدادات Secrets.")
     st.stop()
 
-# البحث عن ملف الوورد
 docx_files = [f for f in BASE.glob("*.docx") if not f.name.startswith("~$")]
 if not docx_files:
     st.error("❌ لم أجد أي ملف وورد في المجلد.")
@@ -31,26 +30,21 @@ FILE = docx_files[0]
 def build():
     doc = docx.Document(str(FILE))
     text_list = []
-    
-    # قراءة الفقرات النصية
     for p in doc.paragraphs:
-        if p.text.strip():
-            text_list.append(p.text)
-            
-    # قراءة الجداول
+        if p.text.strip(): text_list.append(p.text)
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                if cell.text.strip():
-                    text_list.append(cell.text)
-                    
-    text = "\n".join(text_list)
+                if cell.text.strip(): text_list.append(cell.text)
     
+    text = "\n".join(text_list)
     splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=150)
     chunks = splitter.split_documents([Document(page_content=text, metadata={"source": FILE.name})])
     
-    # ⬇️⬇️ التعديل الجوهري: استخدام Gemini API للتضمين بدلاً من النموذج المحلي ⬇️⬇️
-    emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    emb = HuggingFaceEmbeddings(
+        model_name="intfloat/multilingual-e5-small",
+        model_kwargs={"device": "cpu"}
+    )
     return Chroma.from_documents(chunks, emb), len(chunks)
 
 db, n = build()
@@ -64,7 +58,6 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 def generate_answer(q):
-    # 1. إعادة صياغة السؤال
     rewrite_prompt = (
         "أنت خبير في الشؤون الأكاديمية. المستخدم يسأل بلغة بسيطة أو عامية.\n"
         "قم بتحويل سؤاله إلى سؤال رسمي يستخدم المصطلحات الدقيقة الموجودة في دليل الجامعات.\n"
@@ -79,11 +72,9 @@ def generate_answer(q):
     except:
         formal_q = q
 
-    # 2. البحث في الملف
     results = db.similarity_search("query: " + formal_q, k=15)
     context = "\n\n---\n\n".join([d.page_content for d in results])
 
-    # 3. الإجابة
     prompt = (
         "أنت مستشار إداري ذكي ودقيق جداً. أجب على سؤال المستخدم بالعربية بناءً على النص المرفق.\n"
         "إذا كان السؤال يتعلق بالموظفين أو الدراسة، اذكر القاعدة العامة أولاً (هل يجوز أم لا؟)، ثم اذكر الاستثناءات إن وجدت في النص.\n"
@@ -105,7 +96,6 @@ def generate_answer(q):
             
     return "عذراً، النماذج مشغولة حالياً. حاول بعد قليل."
 
-# واجهة الدردشة
 if q := st.chat_input("اكتب سؤالك هنا..."):
     st.session_state.messages.append({"role": "user", "content": q})
     with st.chat_message("user"):
