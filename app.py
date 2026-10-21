@@ -3,8 +3,7 @@ from pathlib import Path
 import streamlit as st
 import docx
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import time
@@ -50,7 +49,8 @@ def build():
     splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=150)
     chunks = splitter.split_documents([Document(page_content=text, metadata={"source": FILE.name})])
     
-    emb = HuggingFaceEmbeddings(model_name="intfloat/multilingual-e5-small")
+    # ⬇️⬇️ التعديل الجوهري: استخدام Gemini API للتضمين بدلاً من النموذج المحلي ⬇️⬇️
+    emb = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
     return Chroma.from_documents(chunks, emb), len(chunks)
 
 db, n = build()
@@ -64,12 +64,11 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 def generate_answer(q):
-    # 1. إعادة صياغة السؤال: تحويل اللغة البسيطة/العامية إلى مصطلحات رسمية
+    # 1. إعادة صياغة السؤال
     rewrite_prompt = (
         "أنت خبير في الشؤون الأكاديمية. المستخدم يسأل بلغة بسيطة أو عامية.\n"
         "قم بتحويل سؤاله إلى سؤال رسمي يستخدم المصطلحات الدقيقة الموجودة في دليل الجامعات.\n"
         "مثال: إذا سأل 'الموظف يدرس'، حولها إلى 'ضوابط الجمع بين الوظيفة والدراسة'.\n"
-        "مثال: إذا سأل 'أنقل من مرحلة'، حولها إلى 'ضوابط انتقال الطلبة بين المراحل'.\n"
         "أعطني السؤال الرسمي فقط بدون أي مقدمات.\n\n"
         f"سؤال المستخدم: {q}"
     )
@@ -80,11 +79,11 @@ def generate_answer(q):
     except:
         formal_q = q
 
-    # 2. البحث في الملف باستخدام السؤال الرسمي
+    # 2. البحث في الملف
     results = db.similarity_search("query: " + formal_q, k=15)
     context = "\n\n---\n\n".join([d.page_content for d in results])
 
-    # 3. الإجابة بلغة بسيطة ودقيقة (ذكر القاعدة أولاً ثم الاستثناءات)
+    # 3. الإجابة
     prompt = (
         "أنت مستشار إداري ذكي ودقيق جداً. أجب على سؤال المستخدم بالعربية بناءً على النص المرفق.\n"
         "إذا كان السؤال يتعلق بالموظفين أو الدراسة، اذكر القاعدة العامة أولاً (هل يجوز أم لا؟)، ثم اذكر الاستثناءات إن وجدت في النص.\n"
