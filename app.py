@@ -6,14 +6,12 @@ import google.generativeai as genai
 st.set_page_config(page_title="المستشار الإداري", layout="wide")
 st.title("🧑‍💼 المستشار الإداري - دليل الطلبة")
 
-# إعداد مفتاح API
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except:
     st.error("❌ لم يتم العثور على المفتاح في إعدادات Secrets.")
     st.stop()
 
-# قراءة الملف (الفقرات والجداول)
 @st.cache_resource
 def load_text():
     import glob
@@ -47,16 +45,27 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
     with st.chat_message("assistant"):
         with st.spinner("⏳ يقرأ الدليل ويجيب..."):
             try:
-                # تم تغيير اسم النموذج هنا إلى النموذج المتاح حالياً
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                
-                # تمرير النص كاملاً إلى Gemini
                 context = document_text[:150000] 
-                
                 instruction = f"أنت مستشار إداري ذكي. أجب على سؤال المستخدم باللغة العربية بناءً على النص المرفق. إذا لم تجد الإجابة، قل (لا يوجد نص صريح).\n\nالنص:\n{context}\n\nسؤال المستخدم: {prompt}"
                 
-                response = model.generate_content(instruction)
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                # نظام ذكي يجرب عدة نماذج حتى يجد واحداً يعمل
+                models_to_try = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash']
+                response = None
+                last_error = None
+                
+                for m in models_to_try:
+                    try:
+                        model = genai.GenerativeModel(m)
+                        response = model.generate_content(instruction)
+                        break # إذا نجح، يخرج من الحلقة فوراً
+                    except Exception as e:
+                        last_error = e
+                        continue # إذا فشل، يجرب النموذج التالي
+                
+                if response:
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+                else:
+                    st.error(f"حدث خطأ في جميع النماذج: {last_error}")
             except Exception as e:
                 st.error(f"حدث خطأ: {e}")
