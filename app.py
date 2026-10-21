@@ -14,11 +14,12 @@ st.title("🧑‍💼 المستشار الإداري - دليل الطلبة")
 
 BASE = Path(__file__).parent
 
-# قراءة المفتاح
-key = ""
-for name in ["key.txt", "api_key.txt", "مفتاح.txt"]:
-    p = BASE / name
+# قراءة المفتاح من إعدادات Streamlit
+try:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+except:
+    st.error("❌ لم يتم العثور على المفتاح. يرجى إضافته في إعدادات Secrets.")
+    st.stop()
 
 # البحث عن ملف الوورد
 docx_files = [f for f in BASE.glob("*.docx") if not f.name.startswith("~$")]
@@ -37,7 +38,7 @@ def build():
         if p.text.strip():
             text_list.append(p.text)
             
-    # قراءة الجداول (هذا هو الحل السحري)
+    # قراءة الجداول
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
@@ -49,7 +50,6 @@ def build():
     splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=150)
     chunks = splitter.split_documents([Document(page_content=text, metadata={"source": FILE.name})])
     
-    # استخدام التضمين المحلي
     emb = HuggingFaceEmbeddings(model_name="intfloat/multilingual-e5-small")
     return Chroma.from_documents(chunks, emb), len(chunks)
 
@@ -64,11 +64,14 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 def generate_answer(q):
-    # 1. إعادة صياغة السؤال
+    # 1. إعادة صياغة السؤال: تحويل اللغة البسيطة/العامية إلى مصطلحات رسمية
     rewrite_prompt = (
-        "أنت خبير في الشؤون الأكاديمية. أعد صياغة السؤال التالي ليكون سؤالاً رسمياً دقيقاً للبحث في الوثائق الرسمية.\n"
-        "صحح الأخطاء الإملائية وافهم المعنى.\n"
-        f"السؤال: {q}"
+        "أنت خبير في الشؤون الأكاديمية. المستخدم يسأل بلغة بسيطة أو عامية.\n"
+        "قم بتحويل سؤاله إلى سؤال رسمي يستخدم المصطلحات الدقيقة الموجودة في دليل الجامعات.\n"
+        "مثال: إذا سأل 'الموظف يدرس'، حولها إلى 'ضوابط الجمع بين الوظيفة والدراسة'.\n"
+        "مثال: إذا سأل 'أنقل من مرحلة'، حولها إلى 'ضوابط انتقال الطلبة بين المراحل'.\n"
+        "أعطني السؤال الرسمي فقط بدون أي مقدمات.\n\n"
+        f"سؤال المستخدم: {q}"
     )
     try:
         rw_llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", temperature=0)
@@ -77,18 +80,19 @@ def generate_answer(q):
     except:
         formal_q = q
 
-    # 2. البحث
-    results = db.similarity_search("query: " + formal_q, k=8)
+    # 2. البحث في الملف باستخدام السؤال الرسمي
+    results = db.similarity_search("query: " + formal_q, k=15)
     context = "\n\n---\n\n".join([d.page_content for d in results])
 
-    # 3. الإجابة
+    # 3. الإجابة بلغة بسيطة ودقيقة (ذكر القاعدة أولاً ثم الاستثناءات)
     prompt = (
-        "أنت مستشار إداري ذكي. أجب على سؤال المستخدم بالعربية بناءً على النص المرفق.\n"
-        "إذا لم يوجد النص، اعتذر بلباقة.\n\n"
+        "أنت مستشار إداري ذكي ودقيق جداً. أجب على سؤال المستخدم بالعربية بناءً على النص المرفق.\n"
+        "إذا كان السؤال يتعلق بالموظفين أو الدراسة، اذكر القاعدة العامة أولاً (هل يجوز أم لا؟)، ثم اذكر الاستثناءات إن وجدت في النص.\n"
+        "اجعل إجابتك بسيطة ومباشرة (ابدأ بـ: نعم يجوز، أو: لا يجوز، ثم اشرح).\n"
+        "إذا لم يوجد النص نهائياً، اعتذر بلباقة.\n\n"
         f"النص:\n{context}\n\nسؤال المستخدم: {q}"
     )
     
-    # النماذج التي استجابت معنا في المقدمة
     MODELS = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash"]
     for model_name in MODELS:
         try:
@@ -98,9 +102,9 @@ def generate_answer(q):
                 return response.content[0].get('text', str(response.content))
             return response.content
         except Exception:
-            continue # ننتقل للنموذج التالي فوراً بدون انتظار
+            continue 
             
-    return "عذراً، النماذج مشغولة حالياً."
+    return "عذراً، النماذج مشغولة حالياً. حاول بعد قليل."
 
 # واجهة الدردشة
 if q := st.chat_input("اكتب سؤالك هنا..."):
