@@ -47,8 +47,10 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
     with st.chat_message("assistant"):
         with st.spinner("⏳ يقرأ الدليل ويجيب..."):
             try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                # تمرير النص كاملاً إلى Gemini (لأنه يستوعب حتى مليون حرف)
+                # تم تغيير اسم النموذج هنا إلى النموذج المتاح حالياً
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                
+                # تمرير النص كاملاً إلى Gemini
                 context = document_text[:150000] 
                 
                 instruction = f"أنت مستشار إداري ذكي. أجب على سؤال المستخدم باللغة العربية بناءً على النص المرفق. إذا لم تجد الإجابة، قل (لا يوجد نص صريح).\n\nالنص:\n{context}\n\nسؤال المستخدم: {prompt}"
