@@ -4,5 +4,3 @@ langchain
 langchain-google-genai
 langchain-chroma
 langchain-community
-sentence-transformers
-torchvision
