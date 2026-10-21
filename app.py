@@ -30,8 +30,23 @@ FILE = docx_files[0]
 @st.cache_resource
 def build():
     doc = docx.Document(str(FILE))
-    text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-    splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=100)
+    text_list = []
+    
+    # قراءة الفقرات النصية
+    for p in doc.paragraphs:
+        if p.text.strip():
+            text_list.append(p.text)
+            
+    # قراءة الجداول (هذا هو الحل السحري)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                if cell.text.strip():
+                    text_list.append(cell.text)
+                    
+    text = "\n".join(text_list)
+    
+    splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=150)
     chunks = splitter.split_documents([Document(page_content=text, metadata={"source": FILE.name})])
     
     # استخدام التضمين المحلي
