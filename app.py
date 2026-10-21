@@ -3,8 +3,7 @@ from pathlib import Path
 import streamlit as st
 import docx
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import time
@@ -14,12 +13,14 @@ st.title("🧑‍💼 المستشار الإداري - دليل الطلبة")
 
 BASE = Path(__file__).parent
 
+# قراءة المفتاح من إعدادات Streamlit
 try:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 except:
     st.error("❌ لم يتم العثور على المفتاح. يرجى إضافته في إعدادات Secrets.")
     st.stop()
 
+# البحث عن ملف الوورد
 docx_files = [f for f in BASE.glob("*.docx") if not f.name.startswith("~$")]
 if not docx_files:
     st.error("❌ لم أجد أي ملف وورد في المجلد.")
@@ -41,10 +42,8 @@ def build():
     splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=150)
     chunks = splitter.split_documents([Document(page_content=text, metadata={"source": FILE.name})])
     
-    emb = HuggingFaceEmbeddings(
-        model_name="intfloat/multilingual-e5-small",
-        model_kwargs={"device": "cpu"}
-    )
+    # ⬇️⬇️ التعديل الجوهري: استخدام Gemini مع التهيئة المتأخرة ⬇️⬇️
+    emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     return Chroma.from_documents(chunks, emb), len(chunks)
 
 db, n = build()
