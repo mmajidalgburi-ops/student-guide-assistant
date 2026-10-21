@@ -48,8 +48,8 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
                 context = document_text[:150000] 
                 instruction = f"أنت مستشار إداري ذكي. أجب على سؤال المستخدم باللغة العربية بناءً على النص المرفق. إذا لم تجد الإجابة، قل (لا يوجد نص صريح).\n\nالنص:\n{context}\n\nسؤال المستخدم: {prompt}"
                 
-                # نظام ذكي يجرب عدة نماذج حتى يجد واحداً يعمل
-                models_to_try = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash']
+                # قائمة النماذج التي سيجربها النظام واحداً تلو الآخر
+                models_to_try = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-1.5-flash']
                 response = None
                 last_error = None
                 
@@ -57,10 +57,10 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
                     try:
                         model = genai.GenerativeModel(m)
                         response = model.generate_content(instruction)
-                        break # إذا نجح، يخرج من الحلقة فوراً
+                        break 
                     except Exception as e:
                         last_error = e
-                        continue # إذا فشل، يجرب النموذج التالي
+                        continue 
                 
                 if response:
                     st.markdown(response.text)
