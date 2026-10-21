@@ -1,6 +1,6 @@
-streamlit
-python-docx
-langchain
-langchain-google-genai
-langchain-chroma
-langchain-community
+streamlit==1.38.0
+python-docx==1.1.2
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-google-genai==2.1.8
+langchain-chroma==0.1.4
