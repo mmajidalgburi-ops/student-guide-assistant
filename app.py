@@ -50,7 +50,7 @@ def build():
     chunks = splitter.split_documents([Document(page_content=text, metadata={"source": FILE.name})])
     
     # ⬇️⬇️ التعديل الجوهري: استخدام Gemini API للتضمين بدلاً من النموذج المحلي ⬇️⬇️
-    emb = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
+    emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     return Chroma.from_documents(chunks, emb), len(chunks)
 
 db, n = build()
